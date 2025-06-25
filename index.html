@@ -2,104 +2,81 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Roblox Inspector - NandoX</title>
+  <title>Page Collector</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
     body {
-      background: #0d0d0d;
-      color: #f2f2f2;
-      font-family: 'Segoe UI', sans-serif;
-      padding: 30px;
-      text-align: center;
-    }
-    h1 {
-      color: #9b59b6;
-      font-size: 2em;
-      margin-bottom: 20px;
-    }
-    textarea {
-      width: 90%;
-      height: 180px;
-      background: #1a1a1a;
+      background: #111;
       color: #fff;
-      border: 1px solid #444;
-      padding: 10px;
-      font-size: 14px;
-      border-radius: 10px;
-      margin-bottom: 20px;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 50px;
     }
     button {
       background: #9b59b6;
-      color: white;
       border: none;
+      color: white;
       padding: 12px 20px;
-      font-size: 15px;
-      border-radius: 8px;
-      margin: 10px;
+      font-size: 16px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: 0.3s;
     }
     button:hover {
       background: #8e44ad;
     }
-    .copy-confirm {
-      margin-top: 10px;
-      font-size: 13px;
-      color: #4cd137;
-    }
   </style>
 </head>
 <body>
-  <h1>🔍 Roblox Bookmarklet - Inspeção Segura</h1>
-
-  <textarea id="bookmarklet" readonly>
-javascript:(function(){
-  let keywords = ['admin','role','access','mod','permission'];
-  let found = [];
-  for (let k in window) {
-    try {
-      if (typeof window[k] === 'object' || typeof window[k] === 'string') {
-        for (let word of keywords) {
-          if (k.toLowerCase().includes(word)) {
-            found.push(`🧠 ${k}: ${typeof window[k] === 'object' ? '[Object]' : window[k]}`);
-            break;
-          }
-        }
-      }
-    } catch (e) {}
-  }
-  let userId = document.body.innerHTML.match(/"UserId":(\d+)/);
-  if (userId) {
-    found.unshift(`🆔 User ID detectado: ${userId[1]}`);
-  }
-  let scripts = Array.from(document.scripts).map(s => s.src).filter(Boolean);
-  if (scripts.length) {
-    found.push(`📦 Scripts carregados:\n` + scripts.join('\n'));
-  }
-  if (found.length) {
-    alert("✅ Informações de inspeção:\n\n" + found.join('\n\n'));
-  } else {
-    alert("Nenhuma informação relevante encontrada.");
-  }
-})();
-  </textarea>
-
-  <br>
-  <button onclick="copyCode()">📋 Copiar Bookmarklet</button>
-  <button onclick="runCode()">🚀 Testar no Site</button>
-
-  <div class="copy-confirm" id="copy-msg"></div>
+  <h1>📦 Site Collector - NandoX</h1>
+  <p>Clique no botão abaixo para capturar o conteúdo da página atual e baixar como .zip</p>
+  <button onclick="captureSite()">📥 Capturar Página</button>
 
   <script>
-    function copyCode() {
-      const textArea = document.getElementById('bookmarklet');
-      textArea.select();
-      document.execCommand('copy');
-      document.getElementById('copy-msg').innerText = "✅ Bookmarklet copiado!";
-      setTimeout(() => document.getElementById('copy-msg').innerText = "", 3000);
+    async function fetchResource(url) {
+      try {
+        const response = await fetch(url);
+        return await response.text();
+      } catch (e) {
+        console.warn("Erro ao buscar:", url);
+        return `/* Falha ao carregar: ${url} */`;
+      }
     }
 
-    function runCode() {
-      eval(document.getElementById('bookmarklet').value);
+    async function captureSite() {
+      const zip = new JSZip();
+      const doc = document.documentElement.outerHTML;
+      zip.file("index.html", doc);
+
+      const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(link => link.href);
+      const jsLinks = Array.from(document.querySelectorAll('script[src]')).map(script => script.src);
+      const imgLinks = Array.from(document.images).map(img => img.src);
+
+      for (let url of cssLinks) {
+        const name = "assets/css/" + url.split('/').pop();
+        const content = await fetchResource(url);
+        zip.file(name, content);
+      }
+
+      for (let url of jsLinks) {
+        const name = "assets/js/" + url.split('/').pop();
+        const content = await fetchResource(url);
+        zip.file(name, content);
+      }
+
+      for (let url of imgLinks) {
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const name = "assets/img/" + url.split('/').pop().split("?")[0];
+          zip.file(name, blob);
+        } catch (e) {
+          console.warn("Erro ao baixar imagem:", url);
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      saveAs(zipBlob, "captured_page.zip");
     }
   </script>
 </body>
